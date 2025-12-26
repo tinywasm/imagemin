@@ -17,10 +17,11 @@ Images are not processed and must be manually optimized.
 ## Objectives
 
 1. **Auto-convert images to WebP format** using `github.com/HugoSmits86/nativewebp`
-2. **Generate responsive variants** for different screen sizes (desktop, tablet, mobile)
+2. **Generate responsive variants** for different screen sizes (Large, Medium, Small)
 3. **Process images from ThemeFolder** and output to WebFilesFolder
-4. **Auto-include images in default template** (`index_basic.html`)
-5. **Maintain consistency** with existing AssetMin architecture
+4. **Event-driven processing only** - no scanning of existing files on startup
+5. **Strict Suffix Requirement** - Images must be named with suffixes (e.g., `image.L.M.jpg`) to be processed
+6. **Maintain consistency** with existing AssetMin architecture
 
 ## Proposed Architecture
 
@@ -37,12 +38,14 @@ func (c *AssetMin) SupportedExtensions() []string {
 ### 2. Image Processing Flow
 
 ```
-Input: ThemeFolder/images/*.{jpg,jpeg,png}
+Input: ThemeFolder/images/*.{L,M,S}.{jpg,jpeg,png}
    ↓
-Process: Convert to WebP + Generate responsive variants
+Process: Parse suffixes -> Generate ONLY requested variants (L, M, or S) -> Convert to WebP
    ↓
-Output: WebFilesFolder/images/*.webp
+Output: WebFilesFolder/images/*.{L,M,S}.webp
 ```
+
+**Important:** Images without L, M, or S suffixes are IGNORED.
 
 ### 3. Configuration Structure
 
@@ -76,10 +79,10 @@ type ImageConfig struct {
 }
 
 type ImageVariant struct {
-    Name      string // e.g., "desktop", "tablet", "mobile"
+    Name      string // "L", "M", "S"
     MaxWidth  int    // maximum width in pixels
     MaxHeight int    // maximum height in pixels (0 = maintain aspect ratio)
-    Suffix    string // e.g., "-lg", "-md", "-sm"
+    Suffix    string // "L", "M", "S"
 }
 ```
 
@@ -94,9 +97,9 @@ defaultImageConfig := &ImageConfig{
     Quality:      80,
     Enabled:      true,
     Variants: []ImageVariant{
-        {Name: "desktop", MaxWidth: 1920, MaxHeight: 0, Suffix: "-lg"},
-        {Name: "tablet",  MaxWidth: 1024, MaxHeight: 0, Suffix: "-md"},
-        {Name: "mobile",  MaxWidth: 640,  MaxHeight: 0, Suffix: "-sm"},
+        {Name: "Large",  MaxWidth: 1920, MaxHeight: 0, Suffix: "L"},
+        {Name: "Medium", MaxWidth: 1024, MaxHeight: 0, Suffix: "M"},
+        {Name: "Small",  MaxWidth: 640,  MaxHeight: 0, Suffix: "S"},
     },
 }
 ```
@@ -106,23 +109,21 @@ defaultImageConfig := &ImageConfig{
 **Input:**
 ```
 ThemeFolder/images/
-  ├── photo.jpg
-  ├── logo.png
-  └── banner.jpeg
+  ├── photo.L.M.jpg    (Processes L and M variants)
+  ├── logo.S.png       (Processes S variant only)
+  ├── banner.L.M.S.jpg (Processes all 3 variants)
+  └── ignored.jpg      (IGNORED - no suffix)
 ```
 
 **Output:**
 ```
 WebFilesFolder/images/
-  ├── photo-lg.webp    (desktop: max 1920px)
-  ├── photo-md.webp    (tablet:  max 1024px)
-  ├── photo-sm.webp    (mobile:  max 640px)
-  ├── logo-lg.webp
-  ├── logo-md.webp
-  ├── logo-sm.webp
-  ├── banner-lg.webp
-  ├── banner-md.webp
-  └── banner-sm.webp
+  ├── photo.L.webp    (Large: max 1920px)
+  ├── photo.M.webp    (Medium: max 1024px)
+  ├── logo.S.webp     (Small: max 640px)
+  ├── banner.L.webp
+  ├── banner.M.webp
+  ├── banner.S.webp
 ```
 
 ### 6. Handler Structure
@@ -148,12 +149,14 @@ func NewImageHandler(ac *AssetConfig) *imageHandler {
 }
 
 func (h *imageHandler) ProcessImage(inputPath string) error {
-    // 1. Read source image
-    // 2. For each variant:
-    //    - Resize if needed
+    // 1. Check filename for suffixes (L, M, S)
+    // 2. If no valid suffixes, return nil (ignore)
+    // 3. Read source image
+    // 4. For each PRESENT suffix in filename:
+    //    - Resize to corresponding variant size
     //    - Convert to WebP
-    //    - Save to output folder with suffix
-    // 3. Return error if any step fails
+    //    - Save to output folder with suffix (e.g. name.L.webp)
+    // 5. Return error if any step fails
 }
 ```
 
@@ -236,8 +239,12 @@ type templateData struct {
 }
 
 type ImageData struct {
-    Name string // base name without extension
+    Name string // base name without extension and suffixes
     Alt  string // alt text (derived from filename)
+    // Availability flags
+    HasL bool
+    HasM bool
+    HasS bool
 }
 ```
 
@@ -245,22 +252,23 @@ type ImageData struct {
 
 Based on modern web standards and common device viewports:
 
-### Desktop (Large)
+### Large (L)
 - **Max Width:** 1920px
 - **Reasoning:** Covers full HD displays (1920x1080)
-- **Suffix:** `-lg`
+- **Suffix:** `L`
 
-### Tablet (Medium)
+### Medium (M)
 - **Max Width:** 1024px
 - **Reasoning:** Standard tablet landscape (iPad: 1024x768)
-- **Suffix:** `-md`
+- **Suffix:** `M`
 
-### Mobile (Small)
+### Small (S)
 - **Max Width:** 640px
 - **Reasoning:** Covers most mobile devices (2x density on 320px physical width)
-- **Suffix:** `-sm`
+- **Suffix:** `S`
 
 ### Additional Considerations
+- **Event-Driven Only:** Images are only processed when a file event occurs. Existing files are not scanned on startup.
 - Always maintain aspect ratio (MaxHeight: 0)
 - Use WebP quality: 80 (good balance between quality and file size)
 - Support lazy loading with `loading="lazy"` attribute

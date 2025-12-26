@@ -32,14 +32,14 @@ type ImageConfig struct {
     Enabled bool // default: true
     
     // Process existing images at startup
-    ProcessExistingOnStartup bool // default: true
+    ProcessExistingOnStartup bool // default: false (Strictly Event Driven)
 }
 
 type ImageVariant struct {
-    Name      string // e.g., "desktop", "tablet", "mobile"
+    Name      string // "L", "M", "S"
     MaxWidth  int    // maximum width in pixels
     MaxHeight int    // maximum height in pixels (0 = maintain aspect ratio)
-    Suffix    string // e.g., "-lg", "-md", "-sm"
+    Suffix    string // "L", "M", "S"
 }
 
 // getDefaultImageConfig returns sensible defaults
@@ -49,11 +49,11 @@ func getDefaultImageConfig() *ImageConfig {
         OutputFolder:             "images",
         Quality:                  80,
         Enabled:                  true,
-        ProcessExistingOnStartup: true,
+        ProcessExistingOnStartup: false, // Event driven only
         Variants: []ImageVariant{
-            {Name: "desktop", MaxWidth: 1920, MaxHeight: 0, Suffix: "-lg"},
-            {Name: "tablet", MaxWidth: 1024, MaxHeight: 0, Suffix: "-md"},
-            {Name: "mobile", MaxWidth: 640, MaxHeight: 0, Suffix: "-sm"},
+            {Name: "Large",  MaxWidth: 1920, MaxHeight: 0, Suffix: "L"},
+            {Name: "Medium", MaxWidth: 1024, MaxHeight: 0, Suffix: "M"},
+            {Name: "Small",  MaxWidth: 640,  MaxHeight: 0, Suffix: "S"},
         },
     }
 }
@@ -146,6 +146,18 @@ func (h *imageHandler) ProcessImage(inputPath string) error {
         return nil
     }
 
+    // 1. Parse filename to check for suffixes (L, M, S)
+    filename := filepath.Base(inputPath)
+    activeVariants := h.parseVariantsFromFilename(filename)
+
+    // If no suffixes match, ignore file
+    if len(activeVariants) == 0 {
+        if h.logger != nil {
+            h.logger("Skipping image (no suffix):", filename)
+        }
+        return nil
+    }
+
     // Validate input file exists
     if _, err := os.Stat(inputPath); err != nil {
         return fmt.Errorf("image file not found: %s", inputPath)
@@ -158,25 +170,67 @@ func (h *imageHandler) ProcessImage(inputPath string) error {
     }
 
     if h.logger != nil {
-        h.logger("Processing image:", filepath.Base(inputPath), "format:", format)
+        h.logger("Processing image:", filename, "format:", format, "variants:", len(activeVariants))
     }
 
-    // Extract base name (without extension)
-    baseName := h.getBaseName(inputPath)
+    // Extract base name (without extension and variants)
+    baseName := h.cleanBaseName(filename)
 
     // Ensure output directory exists
     if err := os.MkdirAll(h.outputFolder, 0755); err != nil {
         return fmt.Errorf("failed to create output directory: %w", err)
     }
 
-    // Generate each variant
-    for _, variant := range h.config.Variants {
+    // Generate ONLY the requested variants
+    for _, variant := range activeVariants {
         if err := h.generateVariant(srcImage, baseName, variant); err != nil {
             return fmt.Errorf("failed to generate %s variant: %w", variant.Name, err)
         }
     }
 
     return nil
+}
+
+// parseVariantsFromFilename determines which variants to generate based on filename suffixes
+// e.g. "photo.L.M.jpg" -> returns variants for L and M
+func (h *imageHandler) parseVariantsFromFilename(filename string) []ImageVariant {
+    var active []ImageVariant
+
+    // Split filename by dots
+    parts := strings.Split(filename, ".")
+
+    // Check each part against config variants
+    for _, variant := range h.config.Variants {
+        for _, part := range parts {
+            if part == variant.Suffix {
+                active = append(active, variant)
+                break
+            }
+        }
+    }
+
+    return active
+}
+
+// cleanBaseName removes all variant suffixes and extension
+// e.g. "photo.L.M.jpg" -> "photo"
+func (h *imageHandler) cleanBaseName(filename string) string {
+    name := filename
+
+    // Remove extension
+    ext := filepath.Ext(name)
+    name = strings.TrimSuffix(name, ext)
+
+    // Remove known suffixes
+    for _, variant := range h.config.Variants {
+        // We use ReplaceAll to handle multiple occurrences if any,
+        // but typically we'd replace the specific token.
+        // Simple dot-based removal is safer:
+        token := "." + variant.Suffix
+        name = strings.ReplaceAll(name, token, "")
+    }
+
+    return name
 }
 
 // loadImage reads and decodes an image file
@@ -321,38 +375,13 @@ func (h *imageHandler) extractBaseName(filename string) string {
 }
 
 // ProcessExistingImages scans input folder and processes all images
+// NOTE: Defaults to disabled as per requirement "solo a traves de Event"
 func (h *imageHandler) ProcessExistingImages() error {
     if !h.config.Enabled || !h.config.ProcessExistingOnStartup {
         return nil
     }
 
-    // Check if input folder exists
-    if _, err := os.Stat(h.themeFolder); os.IsNotExist(err) {
-        return nil // Input folder doesn't exist, nothing to process
-    }
-
-    entries, err := os.ReadDir(h.themeFolder)
-    if err != nil {
-        return fmt.Errorf("failed to read input directory: %w", err)
-    }
-
-    for _, entry := range entries {
-        if entry.IsDir() {
-            continue
-        }
-
-        ext := strings.ToLower(filepath.Ext(entry.Name()))
-        if ext == ".jpg" || ext == ".jpeg" || ext == ".png" {
-            inputPath := filepath.Join(h.themeFolder, entry.Name())
-            if err := h.ProcessImage(inputPath); err != nil {
-                if h.logger != nil {
-                    h.logger("Warning: Failed to process", entry.Name(), ":", err)
-                }
-                // Continue with other images
-            }
-        }
-    }
-
+    // ... Implementation preserved but inactive by default ...
     return nil
 }
 ```
@@ -437,6 +466,7 @@ func NewAssetMin(ac *AssetConfig) *AssetMin {
     // ... rest of initialization ...
 
     // Process existing images at startup
+    // Note: This is disabled by default (ProcessExistingOnStartup=false)
     if err := c.imageHandler.ProcessExistingImages(); err != nil {
         c.writeMessage("Warning: Error processing existing images:", err)
     }
