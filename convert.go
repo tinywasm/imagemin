@@ -3,7 +3,6 @@
 package imagemin
 
 import (
-	"encoding/json"
 	"fmt"
 	"image"
 	"os"
@@ -13,11 +12,6 @@ import (
 	"github.com/HugoSmits86/nativewebp"
 	"github.com/disintegration/imaging"
 )
-
-type manifestEntry struct {
-	Name string `json:"name"`
-	Alt  string `json:"alt"`
-}
 
 func ProcessImage(src ParsedAsset, outputDir string, quality int, log func(...any)) ([]string, error) {
 	img, err := imaging.Open(src.AbsPath)
@@ -85,15 +79,6 @@ func writeWebP(img image.Image, path string, quality int) error {
 	// Note: github.com/HugoSmits86/nativewebp currently only supports lossless WebP encoding (VP8L).
 	// The quality parameter is accepted for future compatibility but not currently used by the encoder.
 	return nativewebp.Encode(f, img, nil)
-}
-
-func writeManifest(outputDir string, entries []manifestEntry) error {
-	manifestPath := filepath.Join(outputDir, "img-manifest.json")
-	data, err := json.MarshalIndent(entries, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(manifestPath, data, 0644)
 }
 
 func deriveAlt(baseName string) string {

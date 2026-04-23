@@ -1,7 +1,6 @@
 package imagemin
 
 import (
-	"path/filepath"
 	"sync"
 	"time"
 )
@@ -41,7 +40,7 @@ func (h *Handler) SupportedExtensions() []string { return []string{} }
 func (h *Handler) NewFileEvent(fileName, extension, filePath, event string) error { return nil }
 
 func (h *Handler) UnobservedFiles() []string {
-	return []string{h.config.OutputDir, filepath.Join(h.config.OutputDir, ".cache.json")}
+	return []string{h.config.OutputDir}
 }
 
 func (h *Handler) MainInputFileRelativePath() string { return "" }

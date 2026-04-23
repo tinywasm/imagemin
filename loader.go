@@ -59,12 +59,23 @@ func (h *Handler) LoadImages() error {
 		return nil
 	}
 
+	var allAssets []ParsedAsset
 	for _, dir := range moduleDirs {
-		err := h.ReloadModule(dir)
+		assets, err := ExtractImages(dir)
 		if err != nil {
-			h.log("warning: failed to process module", dir, ":", err)
+			h.log("warning: failed to extract images from module", dir, ":", err)
+			continue
 		}
+
+		for _, asset := range assets {
+			if err := h.processAsset(asset); err != nil {
+				h.log("warning: failed to process asset", asset.AbsPath, ":", err)
+			}
+		}
+		allAssets = append(allAssets, assets...)
 	}
+
+	h.cleanOrphans(allAssets)
 
 	return nil
 }
@@ -79,67 +90,64 @@ func (h *Handler) ReloadModule(moduleDir string) error {
 		return err
 	}
 
-	if len(assets) > 0 {
-		if err := os.MkdirAll(h.config.OutputDir, 0755); err != nil {
-			return fmt.Errorf("failed to create output directory: %w", err)
-		}
-	}
-
-	cache, err := LoadCache(h.config.OutputDir)
-	if err != nil {
-		return err
-	}
-
 	for _, asset := range assets {
-		if cache.IsUpToDate(asset.AbsPath, asset.Variants, h.config.OutputDir) {
-			continue
+		if err := h.processAsset(asset); err != nil {
+			h.log("warning: failed to process asset", asset.AbsPath, ":", err)
 		}
-
-		outputs, err := ProcessImage(asset, h.config.OutputDir, h.config.Quality, h.log)
-		if err != nil {
-			h.log("error processing image", asset.BaseName, ":", err)
-			continue
-		}
-
-		hash, _ := computeHash(asset.AbsPath)
-		cache.Update(asset.AbsPath, hash, asset.Variants, outputs, asset.Alt, asset.BaseName)
 	}
 
-	// Orphan cleaning
-	currentAssetPaths := make(map[string]bool)
-	for _, asset := range assets {
-		currentAssetPaths[asset.AbsPath] = true
+	return nil
+}
+
+func (h *Handler) processAsset(asset ParsedAsset) error {
+	if IsUpToDate(asset.AbsPath, asset.Variants, h.config.OutputDir) {
+		return nil
 	}
 
-	for absPath, entry := range cache.Entries {
-		// Only clean orphans that belong to the current moduleDir
-		if strings.HasPrefix(absPath, moduleDir) {
-			if !currentAssetPaths[absPath] {
-				for _, f := range entry.OutputFiles {
-					os.Remove(filepath.Join(h.config.OutputDir, f))
-				}
-				delete(cache.Entries, absPath)
+	if err := os.MkdirAll(h.config.OutputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	_, err := ProcessImage(asset, h.config.OutputDir, h.config.Quality, h.log)
+	return err
+}
+
+func (h *Handler) cleanOrphans(allAssets []ParsedAsset) {
+	if h.config.OutputDir == "" {
+		return
+	}
+
+	activeFiles := make(map[string]bool)
+	for _, asset := range allAssets {
+		variantInfos := []struct {
+			v Variant
+			s string
+		}{
+			{VariantS, "S"},
+			{VariantM, "M"},
+			{VariantL, "L"},
+		}
+		for _, vi := range variantInfos {
+			if asset.Variants&vi.v != 0 {
+				activeFiles[fmt.Sprintf("%s.%s.webp", asset.BaseName, vi.s)] = true
 			}
 		}
 	}
 
-	err = cache.Save(h.config.OutputDir)
+	files, err := os.ReadDir(h.config.OutputDir)
 	if err != nil {
-		return err
+		return
 	}
 
-	// Build full manifest from cache
-	cache.mu.RLock()
-	var fullManifest []manifestEntry
-	uniqueBaseNames := make(map[string]string)
-	for _, entry := range cache.Entries {
-		uniqueBaseNames[entry.BaseName] = entry.Alt
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		name := f.Name()
+		if strings.HasSuffix(name, ".webp") {
+			if !activeFiles[name] {
+				os.Remove(filepath.Join(h.config.OutputDir, name))
+			}
+		}
 	}
-	cache.mu.RUnlock()
-
-	for name, alt := range uniqueBaseNames {
-		fullManifest = append(fullManifest, manifestEntry{Name: name, Alt: alt})
-	}
-
-	return writeManifest(h.config.OutputDir, fullManifest)
 }
