@@ -39,7 +39,7 @@ func (h *Handler) SetListModulesFn(fn func(rootDir string) ([]string, error)) {
 	h.listModulesFn = fn
 }
 
-func (h *Handler) Name() string   { return "imagemin" }
+func (h *Handler) Name() string           { return "IMAGEMIN" }
 func (h *Handler) Logger(messages ...any) { h.log(messages...) }
 
 func (h *Handler) UnobservedFiles() []string {
