@@ -11,7 +11,9 @@ import (
 
 func TestMtimeSkipsUnchanged(t *testing.T) {
 	env := newTestEnv(t)
-	env.copyTestImage("img/logo.png", "gopher.S.png")
+	imgPath := filepath.Join(env.ModuleDir, "img/logo.png")
+	os.MkdirAll(filepath.Dir(imgPath), 0755)
+	createTestImage(imgPath, 100, 100)
 	env.writeSSRGoWithImages([]imagemin.Asset{
 		{Path: "img/logo.png", Variants: imagemin.VariantS, Alt: "Logo"},
 	})
@@ -46,7 +48,8 @@ func TestMtimeSkipsUnchanged(t *testing.T) {
 func TestMtimeReprocessesOnChange(t *testing.T) {
 	env := newTestEnv(t)
 	srcPath := filepath.Join(env.ModuleDir, "img/logo.png")
-	env.copyTestImage("img/logo.png", "gopher.S.png")
+	os.MkdirAll(filepath.Dir(srcPath), 0755)
+	createTestImage(srcPath, 100, 100)
 	env.writeSSRGoWithImages([]imagemin.Asset{
 		{Path: "img/logo.png", Variants: imagemin.VariantS, Alt: "Logo"},
 	})
@@ -87,7 +90,9 @@ func TestMtimeReprocessesOnChange(t *testing.T) {
 
 func TestMtimeMissingVariant(t *testing.T) {
 	env := newTestEnv(t)
-	env.copyTestImage("img/logo.png", "gopher.S.png")
+	imgPath := filepath.Join(env.ModuleDir, "img/logo.png")
+	os.MkdirAll(filepath.Dir(imgPath), 0755)
+	createTestImage(imgPath, 100, 100)
 	env.writeSSRGoWithImages([]imagemin.Asset{
 		{Path: "img/logo.png", Variants: imagemin.VariantS | imagemin.VariantM, Alt: "Logo"},
 	})

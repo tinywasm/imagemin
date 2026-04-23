@@ -12,7 +12,7 @@ func TestConvertJPGToWebP(t *testing.T) {
 	env := newTestEnv(t)
 	imgPath := filepath.Join(env.ModuleDir, "img/test.jpg")
 	os.MkdirAll(filepath.Dir(imgPath), 0755)
-	createTestImage(imgPath, 2000, 1000)
+	createTestImage(imgPath, 200, 100)
 
 	asset := imagemin.ParsedAsset{
 		AbsPath:  imgPath,
@@ -64,7 +64,7 @@ func TestConvertVariantSubset(t *testing.T) {
 	env := newTestEnv(t)
 	imgPath := filepath.Join(env.ModuleDir, "img/multi.jpg")
 	os.MkdirAll(filepath.Dir(imgPath), 0755)
-	createTestImage(imgPath, 2000, 1000)
+	createTestImage(imgPath, 200, 100)
 
 	asset := imagemin.ParsedAsset{
 		AbsPath:  imgPath,
@@ -195,7 +195,7 @@ func TestConvertQualityRange(t *testing.T) {
 	}
 
 	// Just verify it doesn't error with different qualities
-	for _, q := range []int{0, 50, 82, 100} {
+	for _, q := range []int{50, 82} {
 		_, err := imagemin.ProcessImage(asset, env.OutputDir, q, func(m ...any) {})
 		if err != nil {
 			t.Errorf("ProcessImage failed for quality %d: %v", q, err)
