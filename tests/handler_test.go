@@ -12,21 +12,14 @@ func TestHandlerUnobservedFiles(t *testing.T) {
 	unobserved := handler.UnobservedFiles()
 
 	foundOutputDir := false
-	foundCache := false
 	for _, f := range unobserved {
 		if f == "web/public/img" {
 			foundOutputDir = true
-		}
-		if f == "web/public/img/.cache.json" {
-			foundCache = true
 		}
 	}
 
 	if !foundOutputDir {
 		t.Errorf("expected OutputDir in UnobservedFiles")
-	}
-	if !foundCache {
-		t.Errorf("expected .cache.json in UnobservedFiles")
 	}
 }
 

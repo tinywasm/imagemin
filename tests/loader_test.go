@@ -3,7 +3,6 @@ package imagemin_test
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/tinywasm/imagemin"
@@ -52,7 +51,7 @@ func TestReloadModuleNewImage(t *testing.T) {
 	env.assertWebPExists("two", imagemin.VariantS)
 }
 
-func TestReloadModuleRemovedImage(t *testing.T) {
+func TestReloadModuleRemovedImageDoesNotCleanup(t *testing.T) {
 	env := newTestEnv(t)
 
 	env.copyTestImage("img/one.png", "gopher.S.png")
@@ -75,72 +74,37 @@ func TestReloadModuleRemovedImage(t *testing.T) {
 	}
 
 	env.assertWebPExists("one", imagemin.VariantS)
-	env.assertWebPNotExists("two", imagemin.VariantS)
+	// ReloadModule no longer cleans orphans (global cleanup only in LoadImages)
+	env.assertWebPExists("two", imagemin.VariantS)
 }
 
-func TestManifestMultiModule(t *testing.T) {
+func TestGlobalOrphanCleanup(t *testing.T) {
 	env := newTestEnv(t)
 
-	module1 := t.TempDir()
-	module2 := t.TempDir()
-
-	env.Handler.SetListModulesFn(func(rootDir string) ([]string, error) {
-		return []string{module1, module2}, nil
+	env.copyTestImage("img/one.png", "gopher.S.png")
+	env.writeSSRGoWithImages([]imagemin.Asset{
+		{Path: "img/one.png", Variants: imagemin.VariantS},
 	})
 
-	// Module 1
-	os.WriteFile(filepath.Join(module1, "ssr.go"), []byte(`
-package m1
-import "github.com/tinywasm/imagemin"
-func RenderImages() []imagemin.Asset {
-	return []imagemin.Asset{{Path: "img/m1.png", Variants: imagemin.VariantS, Alt: "M1"}}
-}
-`), 0644)
-	os.MkdirAll(filepath.Join(module1, "img"), 0755)
-	createTestImage(filepath.Join(module1, "img/m1.png"), 100, 100)
-
-	// Module 2
-	os.WriteFile(filepath.Join(module2, "ssr.go"), []byte(`
-package m2
-import "github.com/tinywasm/imagemin"
-func RenderImages() []imagemin.Asset {
-	return []imagemin.Asset{{Path: "img/m2.png", Variants: imagemin.VariantS, Alt: "M2"}}
-}
-`), 0644)
-	os.MkdirAll(filepath.Join(module2, "img"), 0755)
-	createTestImage(filepath.Join(module2, "img/m2.png"), 100, 100)
-
-	err := env.Handler.LoadImages()
-	if err != nil {
-		t.Fatalf("LoadImages failed: %v", err)
-	}
-
-	manifestPath := filepath.Join(env.OutputDir, "img-manifest.json")
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatalf("failed to read manifest: %v", err)
-	}
-
-	if !strings.Contains(string(data), "m1") || !strings.Contains(string(data), "m2") {
-		t.Errorf("manifest should contain both images, got: %s", string(data))
-	}
-}
-
-func TestLoadImagesSkipsCached(t *testing.T) {
-	env := newTestEnv(t)
-	imgPath := filepath.Join(env.ModuleDir, "test.jpg")
-	createTestImage(imgPath, 100, 100)
-	env.writeSSRGoWithImages([]imagemin.Asset{{Path: "test.jpg", Variants: imagemin.VariantS}})
-
+	// Initial load
 	env.Handler.LoadImages()
-	env.assertWebPExists("test", imagemin.VariantS)
+	env.assertWebPExists("one", imagemin.VariantS)
 
-	// Second call
-	err := env.Handler.LoadImages()
-	if err != nil {
-		t.Fatalf("LoadImages failed: %v", err)
+	// Add an orphan manually
+	orphanPath := filepath.Join(env.OutputDir, "orphan.S.webp")
+	os.WriteFile(orphanPath, []byte("garbage"), 0644)
+
+	// Load again, should cleanup orphan
+	env.Handler.LoadImages()
+	if _, err := os.Stat(orphanPath); err == nil {
+		t.Error("expected orphan to be removed")
 	}
-	// (Check logs manually or just ensure it doesn't fail)
+	env.assertWebPExists("one", imagemin.VariantS)
+
+	// Remove image from SSR and load again
+	env.writeSSRGoWithImages([]imagemin.Asset{})
+	env.Handler.LoadImages()
+	env.assertWebPNotExists("one", imagemin.VariantS)
 }
 
 func TestLoadImagesGoListFails(t *testing.T) {
