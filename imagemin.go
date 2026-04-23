@@ -1,10 +1,7 @@
 package imagemin
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
@@ -49,92 +46,7 @@ func (h *Handler) UnobservedFiles() []string {
 
 func (h *Handler) MainInputFileRelativePath() string { return "" }
 
-func (h *Handler) LoadImages() error {
-	if h.listModulesFn == nil {
-		return fmt.Errorf("listModulesFn not set")
-	}
-
-	moduleDirs, err := h.listModulesFn(h.config.RootDir)
-	if err != nil {
-		h.log("warning: failed to list modules:", err)
-		return nil
-	}
-
-	for _, dir := range moduleDirs {
-		err := h.ReloadModule(dir)
-		if err != nil {
-			h.log("warning: failed to process module", dir, ":", err)
-		}
-	}
-
-	return nil
+// WaitForLoad waits for the initial load to complete.
+func (h *Handler) WaitForLoad(timeout time.Duration) {
+	// Currently LoadImages is synchronous, so this is just for interface compatibility.
 }
-
-func (h *Handler) ReloadModule(moduleDir string) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	assets, err := ExtractImages(moduleDir)
-	if err != nil {
-		return err
-	}
-
-	cache, err := LoadCache(h.config.OutputDir)
-	if err != nil {
-		return err
-	}
-
-	for _, asset := range assets {
-		if cache.IsUpToDate(asset.AbsPath, asset.Variants, h.config.OutputDir) {
-			continue
-		}
-
-		outputs, err := ProcessImage(asset, h.config.OutputDir, h.config.Quality, h.log)
-		if err != nil {
-			h.log("error processing image", asset.BaseName, ":", err)
-			continue
-		}
-
-		hash, _ := computeHash(asset.AbsPath)
-		cache.Update(asset.AbsPath, hash, asset.Variants, outputs, asset.Alt, asset.BaseName)
-	}
-
-	// Orphan cleaning
-	currentAssetPaths := make(map[string]bool)
-	for _, asset := range assets {
-		currentAssetPaths[asset.AbsPath] = true
-	}
-
-	for absPath, entry := range cache.Entries {
-		// Only clean orphans that belong to the current moduleDir
-		if strings.HasPrefix(absPath, moduleDir) {
-			if !currentAssetPaths[absPath] {
-				for _, f := range entry.OutputFiles {
-					os.Remove(filepath.Join(h.config.OutputDir, f))
-				}
-				delete(cache.Entries, absPath)
-			}
-		}
-	}
-
-	err = cache.Save(h.config.OutputDir)
-	if err != nil {
-		return err
-	}
-
-	// Build full manifest from cache
-	cache.mu.RLock()
-	var fullManifest []manifestEntry
-	uniqueBaseNames := make(map[string]string)
-	for _, entry := range cache.Entries {
-		uniqueBaseNames[entry.BaseName] = entry.Alt
-	}
-	cache.mu.RUnlock()
-
-	for name, alt := range uniqueBaseNames {
-		fullManifest = append(fullManifest, manifestEntry{Name: name, Alt: alt})
-	}
-
-	return writeManifest(h.config.OutputDir, fullManifest)
-}
-
-func (h *Handler) WaitForLoad(timeout time.Duration) {}

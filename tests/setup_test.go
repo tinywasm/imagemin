@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
@@ -122,4 +123,23 @@ func createTestImage(path string, width, height int) error {
 	}
 	defer f.Close()
 	return jpeg.Encode(f, img, nil)
+}
+
+func createTestPNG(path string, width, height int, alpha bool) error {
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	a := uint8(255)
+	if alpha {
+		a = 128
+	}
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{uint8(x % 256), uint8(y % 256), 0, a})
+		}
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return png.Encode(f, img)
 }

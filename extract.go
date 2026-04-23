@@ -34,8 +34,26 @@ func ExtractImages(moduleDir string) ([]ParsedAsset, error) {
 			}
 
 			for _, res := range ret.Results {
-				if cl, ok := res.(*ast.CompositeLit); ok {
-					assets = parseAssetSlice(cl, moduleDir)
+				switch r := res.(type) {
+				case *ast.CompositeLit:
+					assets = parseAssetSlice(r, moduleDir)
+				case *ast.Ident:
+					// Look for variable definition in the same function
+					ast.Inspect(fn.Body, func(vn ast.Node) bool {
+						assign, ok := vn.(*ast.AssignStmt)
+						if !ok {
+							return true
+						}
+						for _, lhs := range assign.Lhs {
+							if id, ok := lhs.(*ast.Ident); ok && id.Name == r.Name {
+								if cl, ok := assign.Rhs[0].(*ast.CompositeLit); ok {
+									assets = parseAssetSlice(cl, moduleDir)
+								}
+								return false
+							}
+						}
+						return true
+					})
 				}
 			}
 			return false
