@@ -1,0 +1,101 @@
+//go:build !wasm
+
+package imagemin
+
+import (
+	"encoding/json"
+	"fmt"
+	"image"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/HugoSmits86/nativewebp"
+	"github.com/disintegration/imaging"
+)
+
+type manifestEntry struct {
+	Name string `json:"name"`
+	Alt  string `json:"alt"`
+}
+
+func ProcessImage(src ParsedAsset, outputDir string, quality int, log func(...any)) ([]string, error) {
+	img, err := imaging.Open(src.AbsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open image %s: %w", src.AbsPath, err)
+	}
+
+	bounds := img.Bounds()
+	originalWidth := bounds.Dx()
+
+	variants := []struct {
+		v     Variant
+		width int
+	}{
+		{VariantS, 640},
+		{VariantM, 1024},
+		{VariantL, 1920},
+	}
+
+	var outputFiles []string
+	for _, vInfo := range variants {
+		if src.Variants&vInfo.v != 0 {
+			var processedImg image.Image
+			if originalWidth <= vInfo.width {
+				log("image smaller than target, skipping resize", src.BaseName, vInfo.v)
+				processedImg = img
+			} else {
+				processedImg = imaging.Resize(img, vInfo.width, 0, imaging.Lanczos)
+			}
+
+			outputName := fmt.Sprintf("%s.%s.webp", src.BaseName, variantSuffix(vInfo.v))
+			outputPath := filepath.Join(outputDir, outputName)
+
+			err := writeWebP(processedImg, outputPath, quality)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write webp %s: %w", outputName, err)
+			}
+			outputFiles = append(outputFiles, outputName)
+		}
+	}
+
+	return outputFiles, nil
+}
+
+func variantSuffix(v Variant) string {
+	switch v {
+	case VariantS:
+		return "S"
+	case VariantM:
+		return "M"
+	case VariantL:
+		return "L"
+	default:
+		return "unknown"
+	}
+}
+
+func writeWebP(img image.Image, path string, quality int) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Note: github.com/HugoSmits86/nativewebp currently only supports lossless WebP encoding (VP8L).
+	// The quality parameter is accepted for future compatibility but not currently used by the encoder.
+	return nativewebp.Encode(f, img, nil)
+}
+
+func writeManifest(outputDir string, entries []manifestEntry) error {
+	manifestPath := filepath.Join(outputDir, "img-manifest.json")
+	data, err := json.MarshalIndent(entries, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(manifestPath, data, 0644)
+}
+
+func deriveAlt(baseName string) string {
+	return strings.ReplaceAll(baseName, "-", " ")
+}
