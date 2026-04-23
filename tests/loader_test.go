@@ -139,9 +139,3 @@ func TestReloadModuleNoSSRFile(t *testing.T) {
 		t.Fatalf("ReloadModule should not fail if no ssr.go exists: %v", err)
 	}
 }
-
-func TestWaitForLoadTimeout(t *testing.T) {
-	env := newTestEnv(t)
-	// Currently WaitForLoad is a no-op, so it should return immediately
-	env.Handler.WaitForLoad(1)
-}

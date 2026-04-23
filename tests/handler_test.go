@@ -22,11 +22,3 @@ func TestHandlerUnobservedFiles(t *testing.T) {
 		t.Errorf("expected OutputDir in UnobservedFiles")
 	}
 }
-
-func TestHandlerNewFileEventNoop(t *testing.T) {
-	handler := imagemin.New(&imagemin.Config{})
-	err := handler.NewFileEvent("file", ".png", "path", "create")
-	if err != nil {
-		t.Errorf("NewFileEvent should not return error: %v", err)
-	}
-}

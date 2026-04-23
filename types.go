@@ -18,10 +18,3 @@ type Asset struct {
 	Variants Variant // e.g., AllVariants, VariantS|VariantM, VariantL
 	Alt      string  // SEO alternative text; if empty derived from filename
 }
-
-type ParsedAsset struct {
-	AbsPath  string  // absolute path: moduleDir + "/" + asset.Path
-	Variants Variant // resolved bitmask value
-	Alt      string
-	BaseName string  // base name without extension: "logo", "hero"
-}

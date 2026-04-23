@@ -1,9 +1,15 @@
+//go:build !wasm
+
 package imagemin
 
-import (
-	"sync"
-	"time"
-)
+import "sync"
+
+type ParsedAsset struct {
+	AbsPath  string  // absolute path: moduleDir + "/" + asset.Path
+	Variants Variant // resolved bitmask value
+	Alt      string
+	BaseName string // base name without extension: "logo", "hero"
+}
 
 type Handler struct {
 	mu            sync.Mutex
@@ -33,19 +39,9 @@ func (h *Handler) SetListModulesFn(fn func(rootDir string) ([]string, error)) {
 	h.listModulesFn = fn
 }
 
-func (h *Handler) Name() string { return "imagemin" }
-
-func (h *Handler) SupportedExtensions() []string { return []string{} }
-
-func (h *Handler) NewFileEvent(fileName, extension, filePath, event string) error { return nil }
+func (h *Handler) Name() string   { return "imagemin" }
+func (h *Handler) Logger(messages ...any) { h.log(messages...) }
 
 func (h *Handler) UnobservedFiles() []string {
 	return []string{h.config.OutputDir}
-}
-
-func (h *Handler) MainInputFileRelativePath() string { return "" }
-
-// WaitForLoad waits for the initial load to complete.
-func (h *Handler) WaitForLoad(timeout time.Duration) {
-	// Currently LoadImages is synchronous, so this is just for interface compatibility.
 }
