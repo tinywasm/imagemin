@@ -3,7 +3,7 @@ package imagemin_test
 import (
 	"testing"
 
-	"github.com/tinywasm/imagemin"
+	"webtyp.com/imagemin"
 )
 
 func TestVariantBitmask(t *testing.T) {

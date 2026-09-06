@@ -1,6 +1,6 @@
 # Imagemin Architecture
 
-`imagemin` is a specialized image processing library for Go SSR (Server-Side Rendering) modules within the `tinywasm` ecosystem. Its primary goal is to automate the generation of responsive WebP images from declarations in module source code.
+`imagemin` is a specialized image processing library for Go SSR (Server-Side Rendering) modules within the `webtyp` ecosystem. Its primary goal is to automate the generation of responsive WebP images from declarations in module source code.
 
 ## Core Concepts
 

@@ -24,7 +24,7 @@ Modules declare their images by implementing a `RenderImages` function:
 
 package mymodule
 
-import "github.com/tinywasm/imagemin"
+import "webtyp.com/imagemin"
 
 func RenderImages() []imagemin.Asset {
     return []imagemin.Asset{

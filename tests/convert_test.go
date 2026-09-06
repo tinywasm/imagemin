@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/tinywasm/imagemin"
+	"webtyp.com/imagemin"
 )
 
 func TestConvertJPGToWebP(t *testing.T) {
@@ -114,7 +114,7 @@ func TestConvertAltDerivedFromFilename(t *testing.T) {
 	// We need writeSSRGo for ExtractImages to work in this env
 	env.writeSSRGo(`
 package m
-import "github.com/tinywasm/imagemin"
+import "webtyp.com/imagemin"
 func RenderImages() []imagemin.Asset {
 	return []imagemin.Asset{{Path: "img/my-hero.jpg", Variants: imagemin.VariantS}}
 }

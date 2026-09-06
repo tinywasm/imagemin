@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/tinywasm/imagemin"
+	"webtyp.com/imagemin"
 )
 
 func TestLoadImagesFromModule(t *testing.T) {

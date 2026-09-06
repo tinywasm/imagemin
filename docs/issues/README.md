@@ -261,7 +261,7 @@ The `<picture>` element provides:
 ```go
 package main
 
-import "github.com/tinywasm/assetmin"
+import "webtyp.com/assetmin"
 
 func main() {
     handler := assetmin.NewAssetMin(&assetmin.AssetConfig{

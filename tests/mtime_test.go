@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tinywasm/imagemin"
+	"webtyp.com/imagemin"
 )
 
 func TestMtimeSkipsUnchanged(t *testing.T) {

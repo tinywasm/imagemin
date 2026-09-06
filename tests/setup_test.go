@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/tinywasm/imagemin"
+	"webtyp.com/imagemin"
 )
 
 type TestEnv struct {
@@ -51,7 +51,7 @@ func (e *TestEnv) writeSSRGo(content string) {
 }
 
 func (e *TestEnv) writeSSRGoWithImages(assets []imagemin.Asset) {
-	content := "//go:build !wasm\n\npackage module\n\nimport \"github.com/tinywasm/imagemin\"\n\nfunc RenderImages() []imagemin.Asset {\n\treturn []imagemin.Asset{\n"
+	content := "//go:build !wasm\n\npackage module\n\nimport \"webtyp.com/imagemin\"\n\nfunc RenderImages() []imagemin.Asset {\n\treturn []imagemin.Asset{\n"
 	for _, asset := range assets {
 		content += fmt.Sprintf("\t\t{Path: %q, Variants: imagemin.Variant(%d), Alt: %q},\n", asset.Path, asset.Variants, asset.Alt)
 	}

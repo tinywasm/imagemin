@@ -1,4 +1,4 @@
-module github.com/tinywasm/imagemin
+module webtyp.com/imagemin
 
 go 1.24.0
 
